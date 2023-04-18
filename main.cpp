@@ -6,6 +6,8 @@
 #include <array>
 #include <fstream>
 #include <cmath>
+#include <memory>
+#include <list>
 
 //---------------------------------------------------------------------------------------------------------------------------------
 
@@ -16,15 +18,27 @@ int RandomInt(int min, int max, std::mt19937& rng);
 //---------------------------------------------------------------------------------------------------------------------------------
 
 
-const int screenWidth = 2440, screenHeight = 1368;
+const int screenWidth = 2440, screenHeight = 1368, maxTreeDepth = 5;
 
 std::mt19937 rng = CreateGeneratorWithTimeSeed();
 
 //---------------------------------------------------------------------------------------------------------------------------------
 
+class Particle{
+public:
+    Vector2 pos;
+    Color color;
+
+    Particle(Vector2 position, Color col){
+        pos = position;
+        color = col;
+    }
+};
+
 enum CreatureType{
     GenericPrey,
-    GenericPredator
+    GenericPredator, 
+    potato
 };
 
 class Creature{
@@ -33,7 +47,7 @@ public:
     double energy;
     int initialEnergy;
     double maxSpeed;
-    int initialMaxSpeed;
+    double initialMaxSpeed;
     float direction;
     Vector2 position;
     Vector2 velocity;
@@ -46,26 +60,34 @@ public:
     int waterLevel;
     unsigned long age;
     bool alive;
+    double attackDamage;
 
-    Creature(CreatureType type, int speed, float range){
+    Creature(CreatureType type, double speed, float range, Vector2 pos, double orientation, double hp, double s, double e, double at){
         species = type;
         maxSpeed = speed;
         initialMaxSpeed = speed;
         sightRange = range;
-        position = {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)};
-        direction = RandomFloat(0, 360, rng);
-        health = 100;
+        position = pos;
+        direction = orientation;
+        health = hp;
         initialHealth = 100;
-        size = 1;
-        energy = 100000;
+        size = s;
+        energy = e;
         initialEnergy = 100000;
         alive = true;
         age = 0;
+        attackDamage = at;
     }
+
+    Creature() : Creature(GenericPrey, 0.0, 0.0f, Vector2{10, 10}, 0.0, 0.0, 0.0, 0.0, 0.0) {}
+
+    Creature(CreatureType type, double speed, float range) : Creature(type, speed, range, {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)}, RandomFloat(0, 360, rng), 100, 10, 100000, 50) {}
+
+    Creature(CreatureType type, Vector2 pos, double speed, float range) : Creature(type, speed, range, pos, 0.0, 0.0, 0.0, 0.0, 50) {}
 
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
         static constexpr double sightCost = 1;
-        return 100*size*size*size + maxSpeed*maxSpeed + sightCost*sightRange;
+        return 0.01*size*size*size + 1*maxSpeed*maxSpeed + sightCost*sightRange;
     }
 
     void move(){
@@ -105,17 +127,36 @@ public:
 
     }
 
-    void update(){
-        age++;
+    void die(){
+        alive = false;
+    }
 
-        /*double ageSpeedDecayFactor = 1 / 1000000.0;
-        double speedPeakAge = 500;
-        double ds = double(initialMaxSpeed) - ageSpeedDecayFactor*(age-speedPeakAge)*(age-speedPeakAge);
-        if(ds >= 0){
-            maxSpeed = ds;
+    void updateAge(double ageSpeedDecayFactor, double speedPeakAge, int frame){             //age is measured in seconds at 100 FPS
+        if(frame == 0){
+            try{
+                if((initialMaxSpeed - ageSpeedDecayFactor*(age-speedPeakAge)*(age-speedPeakAge)) < 0){
+                    throw std::runtime_error("Initial Speed negative");
+                }   
+            }
+            catch(const std::exception& ex){
+                std::cerr << "Error: " << ex.what() << std::endl;
+                exit(EXIT_FAILURE);
+            }
         }
-        std::cout << age << ", " << maxSpeed << std::endl;*/
+        if(frame % 100 == 0){
+            age++;
+        }
 
+        double temp = initialMaxSpeed - ageSpeedDecayFactor*(age-speedPeakAge)*(age-speedPeakAge);      //decay factor must be small or the parabola starts negative
+        if(temp > 0){
+            maxSpeed = temp;
+        }
+        else{
+            maxSpeed = 0;
+        }
+    }
+
+    void updateEnergy(){
         double energyCost = calculateEnergyCost(maxSpeed, sightRange, size);
         if(energy - energyCost > 0){
             energy -= energyCost;
@@ -123,14 +164,152 @@ public:
         else{
             die();
         }
-
-        move();
-        shiftDirectionRandomly(0.4);
     }
 
-    void die(){
-        alive = false;
+    void reproduce(std::vector<Creature>& creatures){
+        if(position.x > 2*size){
+            Creature kid(species, initialMaxSpeed, sightRange, position, direction, initialHealth, size, initialEnergy, attackDamage);
+            kid.direction = direction += 180;
+            creatures.push_back(kid);
+        }
+        else if(screenWidth - position.x > 2*size){
+            Creature kid(species, initialMaxSpeed, sightRange, position, direction, initialHealth, size, initialEnergy, attackDamage);
+            kid.direction = direction += 180;
+            creatures.push_back(kid);
+        }
     }
+};
+
+class QuadTree{
+public:
+
+    int currentDepth;
+    Rectangle currentSize;
+    std::vector<Particle> particles;
+    std::array<std::shared_ptr<QuadTree>, 4> children{};
+    std::array<Rectangle, 4> childAreas{};
+
+    QuadTree(const int setDepth, const Rectangle& setSize){
+        currentDepth = setDepth;
+        resize(setSize);
+    }
+
+    void resize(const Rectangle& setSize){
+        clear(); 
+        currentSize = setSize;
+
+        float newWidth = currentSize.width / 2.0f, newHeight = currentSize.height / 2.0f;
+        float x = currentSize.x, y = currentSize.y;
+
+        childAreas = {
+            Rectangle{x + newWidth, y, newWidth, newHeight},
+            Rectangle{x, y, newWidth, newHeight},
+            Rectangle{x, y + newHeight, newWidth, newHeight},
+            Rectangle{x + newWidth, y + newHeight, newWidth, newHeight}
+        };
+
+    }
+
+    void clear(){
+        particles.clear();
+
+        for(int i = 0; i < 4; i++){
+            if(children[i]){
+                children[i]->clear();
+            }
+            children[i].reset();
+        }
+    }
+
+    void insert(const Particle& newParticle){
+        for(int i = 0 ; i < 4; i++){
+            if(CheckCollisionPointRec(newParticle.pos, childAreas[i])){
+                if(currentDepth + 1 < maxTreeDepth){
+                    if(!children[i]){
+                        children[i] = std::make_shared<QuadTree>(currentDepth + 1, childAreas[i]);
+                    }
+                    children[i]->insert(newParticle);
+                    return;
+                }
+            }
+        }
+
+        //didn't fit in children, so must go here
+        particles.emplace_back(newParticle);
+    }
+
+    std::list<Particle> search(Vector2& center, float radius, bool removeSearched){
+        std::list<Particle> result;
+
+        // Check if the search area intersects the QuadTree node's boundary
+        if(!CheckCollisionCircleRec(center, radius, currentSize)) {
+            return result;
+        }
+
+        // If this node has particles, add the ones within the search area to the result list
+        for(unsigned int i = 0; i < particles.size(); i++){
+            if(CheckCollisionPointCircle(particles[i].pos, center, radius)){
+                result.push_back(particles[i]);
+                if(removeSearched){
+                    particles.erase(particles.begin() + i);
+                }
+            }
+        }
+
+        // Recursively search the children nodes
+        for(int i = 0; i < 4; i++){
+            if(children[i]){
+                auto childResult = children[i]->search(center, radius, removeSearched);
+                result.splice(result.end(), childResult);
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<Particle> returnAll(int depth){
+        std::vector<Particle> result;
+
+        if(currentDepth >= depth){
+            result.insert(result.end(), particles.begin(), particles.end());
+        }
+
+        for(int i = 0; i < 4; i++){
+            if(children[i]){
+                auto childResult = children[i]->returnAll(depth);
+                result.insert(result.end(), childResult.begin(), childResult.end());
+            }
+        }
+
+        return result;
+    }
+
+    int size() const{
+        int count = particles.size();
+
+        for(int i = 0 ; i < 4; i++){
+            if(children[i]){
+                count += children[i]->size();
+            }
+        }
+
+        return count;
+    }
+
+    void draw() const{
+        for(const auto& particle : particles){
+            DrawPixelV(particle.pos, particle.color);
+        }
+
+        //DrawRectangleLinesEx(currentSize, 0.7, GREEN);
+
+        for(int i = 0; i < 4; i++){
+            if(children[i]){
+                children[i]->draw();
+            }
+        }
+    }
+
 };
 
 //---------------------------------------------------------------------------------------------------------------------------------
@@ -155,7 +334,20 @@ int RandomInt(int min, int max, std::mt19937& rng){
     return dist(rng);
 }
 
+bool vectorsEqual(Vector2 v1, Vector2 v2){
+    if(v1.x == v2.x && v1.y == v2.y){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
 
+float vector2distance(Vector2 v1, Vector2 v2) {
+    float dx = v2.x - v1.x;
+    float dy = v2.y - v1.y;
+    return std::sqrt(dx * dx + dy * dy);
+}
 //---------------------------------------------------------------------------------------------------------------------------------
 
 void initialize(){
@@ -167,7 +359,6 @@ void drawBackground(){
     ClearBackground(RAYWHITE);
     DrawFPS(screenWidth - 40, 20);
 }
-
 
 void run(){
     initialize();
@@ -203,36 +394,141 @@ void drawHealthBar(Creature& creature, int barWidth, int barHeight, int vertical
     }
 }
 
+std::vector<Creature> initializeRandomCreatures(int number, CreatureType type){
+    std::vector<Creature> creatures(number, {type, 1, 2});
+    for(int i = 0; i < number; i++){
+
+    }
+}
+
+QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& prey){
+    QuadTree qt(0, Rectangle{0, 0, screenWidth, screenHeight});
+    Color predColor = RED, preyColor = GREEN;
+
+    for(const auto& p : predators){
+        qt.insert(Particle{p.position, predColor});
+    }
+
+    for(const auto& p : prey){
+        qt.insert(Particle{p.position, preyColor});
+    }
+
+    return qt;
+}
+
+void checkCollisions(std::vector<Creature>& predators, std::vector<Creature>& prey, QuadTree& qt){
+    double searchRadius = 100;
+    std::list<Particle> colliding;
+
+    for(auto& predator : predators){
+        qt.search(predator.position, searchRadius, false);
+    }
+}
+
+void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
+    for(int i = 0; i < predators.size(); i++){
+        for(int j = 0; j < prey.size(); j++){
+            if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
+                prey[j].health -= predators[i].attackDamage;
+
+                if(prey[j].health <= 0){
+                    predators[i].energy += prey[j].energy;
+                    prey.erase(prey.begin() + j);
+                }
+
+                if(predators[i].energy >= predators[i].initialEnergy){
+                    predators[i].reproduce(predators);
+                }
+            }
+        }
+    }
+}
 //---------------------------------------------------------------------------------------------------------------------------------
 
 int main() {
-
     initialize();
-    Creature adam(GenericPredator, 1, 1);
+
+    int numPredators = 10, numPrey = 20;
+    Color predColor = RED, preyColor = GREEN;
+
+    std::vector<Creature> predators(numPredators);
+    std::vector<Creature> prey(numPrey);
+
+    for(int i = 0; i < numPredators; i++){
+        predators[i] = Creature(GenericPredator, 1, 2);
+    }
+    for(int i = 0; i < numPrey; i++){
+        prey[i] = Creature(GenericPrey, 5, 1);
+    }
+
+    QuadTree qt(0, {0, 0, screenWidth, screenHeight});
+
+    for(int i = 0; i < numPredators; i++){
+        Particle p(predators[i].position, RED);
+        qt.insert(p);
+    }
+
+    for(int i = 0; i < numPrey; i++){
+        Particle p(prey[i].position, GREEN);
+        qt.insert(p);
+    }
+
 
     for(int frame = 0; !WindowShouldClose(); frame++){
-        //Creature adam(GenericPredator, 0, 1);
+
+        qt = initializeQT(predators, prey);
+        primativeCollisionCheck(predators, prey);
 
         BeginDrawing();
-
         drawBackground();
 
-        if(adam.alive){
-            //DrawRectangleV({adam.position.x - 10, adam.position.y - 20}, {20*float((adam.energy/100000)), 2}, GREEN);
-            //DrawRectangleV({adam.position.x - 10 + 20*float((adam.energy/100000)), adam.position.y - 20}, {20*float((100000 - adam.energy)/100000), 2}, RED);
-            
-            drawHealthBar(adam, 40, 3, 20, GREEN, RED, 1);
-            drawHealthBar(adam, 40, 3, 20, GREEN, RED, 2);
-            DrawCircleV(adam.position, 10, GREEN);
-            adam.update();
+        // Draw predators
+        for(int i = 0 ; i < predators.size(); i++){
+            drawHealthBar(predators[i], 40, 3, 20, GREEN, RED, 1);
+            drawHealthBar(predators[i], 40, 3, 20, BLUE, ORANGE, 2);
+            DrawCircleV(predators[i].position, predators[i].size, predColor);
         }
-        else{
-            //std::cout << "dead" << std::endl;
-            DrawCircleV(adam.position, 10, RED);
+
+        // Draw prey
+        for(int i = 0; i < prey.size(); i++){
+            drawHealthBar(prey[i], 40, 3, 20, GREEN, RED, 1);
+            drawHealthBar(prey[i], 40, 3, 20, BLUE, ORANGE, 2);
+            DrawCircleV(prey[i].position, prey[i].size, preyColor);
         }
 
         EndDrawing();
-    }
 
+        // Update predators
+        for(int i = 0; i < predators.size(); i++){
+            if(!predators[i].alive){
+                predators.erase(predators.begin() + i);
+                i--;
+                continue;
+            }
+            predators[i].updateAge(0.001, 0, frame);
+            predators[i].updateEnergy();
+            predators[i].move();
+            predators[i].shiftDirectionRandomly(1);
+        }
+
+        // Update prey
+        for(int i = 0; i < prey.size(); i++){
+            if(!prey[i].alive){
+                prey.erase(prey.begin() + i);
+                i--;
+                continue;
+            }
+            prey[i].updateAge(0.0001, 100, frame);
+            prey[i].updateEnergy();
+            prey[i].move();
+            prey[i].shiftDirectionRandomly(0.5);
+        }
+
+        std::cout << prey.size() << std::endl;
+
+        if(frame % 100 == 0){
+            prey[RandomInt(0, prey.size(), rng)].reproduce(prey);
+        }
+    }
     return 0;
 }
