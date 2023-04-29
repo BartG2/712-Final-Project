@@ -41,7 +41,20 @@ enum CreatureType{
     potato
 };
 
-class Creature{
+struct CreatureParameters {
+    CreatureType species = GenericPrey;
+    double maxSpeed = 1.0;
+    float sightRange = 10.0f;
+    Vector2 position = {100, 100};
+    double direction = 0.0;
+    double health = 100;
+    double size = 5;
+    double energy = 100000;
+    double attackDamage = 20;
+    double attackCooldownLength = 100;
+};
+
+class Creature {
 public:
     CreatureType species;
     double energy;
@@ -61,29 +74,26 @@ public:
     unsigned long age;
     bool alive;
     double attackDamage;
+    bool attackCooldown;
 
-    Creature(CreatureType type, double speed, float range, Vector2 pos, double orientation, double hp, double s, double e, double at){
-        species = type;
-        maxSpeed = speed;
-        initialMaxSpeed = speed;
-        sightRange = range;
-        position = pos;
-        direction = orientation;
-        health = hp;
-        initialHealth = 100;
-        size = s;
-        energy = e;
-        initialEnergy = 100000;
-        alive = true;
-        age = 0;
-        attackDamage = at;
-    }
+    Creature(const CreatureParameters& params)
+        : species(params.species),
+          maxSpeed(params.maxSpeed),
+          initialMaxSpeed(params.maxSpeed),
+          sightRange(params.sightRange),
+          position(params.position),
+          direction(params.direction),
+          health(params.health),
+          initialHealth(100),
+          size(params.size),
+          energy(params.energy),
+          initialEnergy(100000),
+          alive(true),
+          age(0),
+          attackDamage(params.attackDamage),
+          attackCooldown(false) {}
 
-    Creature() : Creature(GenericPrey, 0.0, 0.0f, Vector2{10, 10}, 0.0, 0.0, 0.0, 0.0, 0.0) {}
-
-    Creature(CreatureType type, double speed, float range) : Creature(type, speed, range, {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)}, RandomFloat(0, 360, rng), 100, 10, 100000, 50) {}
-
-    Creature(CreatureType type, Vector2 pos, double speed, float range) : Creature(type, speed, range, pos, 0.0, 0.0, 0.0, 0.0, 50) {}
+    Creature() : Creature(CreatureParameters()) {}
 
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
         static constexpr double sightCost = 1;
@@ -99,18 +109,6 @@ public:
         else{
             direction -= 180;
         }
-    }
-
-    void incrementalRandomWalk(float dv){
-        float dx, dy;  
-
-        do
-        {
-            float dx = RandomFloat(-dv, dv, rng);
-            float dy = RandomFloat(-dv, dv, rng);
-        } while ((position.x > screenWidth and dx > 0) or (position.x < 0 and dx < 0) or (position.y > screenHeight and dy > 0) or (position.y < screenHeight and dy < 0));
-        
-        velocity = {dx, dy};
     }
 
     void shiftDirectionRandomly(float magnitude){
@@ -153,6 +151,7 @@ public:
         }
         else{
             maxSpeed = 0;
+            die();
         }
     }
 
@@ -167,13 +166,25 @@ public:
     }
 
     void reproduce(std::vector<Creature>& creatures){
+
+        CreatureParameters kidParams;
+        kidParams.species = species;
+        kidParams.maxSpeed = initialMaxSpeed;
+        kidParams.sightRange = sightRange;
+        kidParams.position = position;
+        kidParams.direction = direction;
+        kidParams.health = initialHealth;
+        kidParams.size = size;
+        kidParams.energy = initialEnergy;
+        kidParams.attackDamage = attackDamage;
+
         if(position.x > 2*size){
-            Creature kid(species, initialMaxSpeed, sightRange, position, direction, initialHealth, size, initialEnergy, attackDamage);
+            Creature kid(kidParams);
             kid.direction = direction += 180;
             creatures.push_back(kid);
         }
         else if(screenWidth - position.x > 2*size){
-            Creature kid(species, initialMaxSpeed, sightRange, position, direction, initialHealth, size, initialEnergy, attackDamage);
+            Creature kid(kidParams);
             kid.direction = direction += 180;
             creatures.push_back(kid);
         }
@@ -394,13 +405,6 @@ void drawHealthBar(Creature& creature, int barWidth, int barHeight, int vertical
     }
 }
 
-std::vector<Creature> initializeRandomCreatures(int number, CreatureType type){
-    std::vector<Creature> creatures(number, {type, 1, 2});
-    for(int i = 0; i < number; i++){
-
-    }
-}
-
 QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& prey){
     QuadTree qt(0, Rectangle{0, 0, screenWidth, screenHeight});
     Color predColor = RED, preyColor = GREEN;
@@ -429,7 +433,11 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
     for(int i = 0; i < predators.size(); i++){
         for(int j = 0; j < prey.size(); j++){
             if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
-                prey[j].health -= predators[i].attackDamage;
+                
+                if(!predators[i].attackCooldown){
+                    prey[j].health -= predators[i].attackDamage;
+                    predators[i].attackCooldown = true;
+                }
 
                 if(prey[j].health <= 0){
                     predators[i].energy += prey[j].energy;
@@ -448,17 +456,37 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
 int main() {
     initialize();
 
-    int numPredators = 10, numPrey = 20;
+    int numPredators = 10, numPrey = 50;
     Color predColor = RED, preyColor = GREEN;
 
     std::vector<Creature> predators(numPredators);
     std::vector<Creature> prey(numPrey);
 
+    CreatureParameters initialPredatorP;
+    initialPredatorP.species = GenericPredator;
+    initialPredatorP.size = 7;
+    initialPredatorP.attackDamage = 10;
+    initialPredatorP.energy = 100000;
+    initialPredatorP.maxSpeed = 1;
+    initialPredatorP.sightRange = 1;
+
+    CreatureParameters initialPreyP;
+    initialPreyP.species = GenericPrey;
+    initialPreyP.size = 7;
+    initialPreyP.attackDamage = 0;
+    initialPreyP.energy = 100000;
+    initialPreyP.maxSpeed = 1.1;
+    initialPreyP.sightRange = 1;
+
     for(int i = 0; i < numPredators; i++){
-        predators[i] = Creature(GenericPredator, 1, 2);
+        initialPredatorP.position = {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)};
+        initialPredatorP.direction = RandomFloat(0, 360, rng); // Set a random direction
+        predators[i] = Creature(initialPredatorP);
     }
     for(int i = 0; i < numPrey; i++){
-        prey[i] = Creature(GenericPrey, 5, 1);
+        initialPreyP.position = {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)};
+        initialPreyP.direction = RandomFloat(0, 360, rng); // Set a random direction
+        prey[i] = Creature(initialPreyP);
     }
 
     QuadTree qt(0, {0, 0, screenWidth, screenHeight});
@@ -505,10 +533,10 @@ int main() {
                 i--;
                 continue;
             }
-            predators[i].updateAge(0.001, 0, frame);
+            predators[i].updateAge(0.001, 10, frame);
             predators[i].updateEnergy();
             predators[i].move();
-            predators[i].shiftDirectionRandomly(1);
+            predators[i].shiftDirectionRandomly(0.7);
         }
 
         // Update prey
@@ -518,17 +546,16 @@ int main() {
                 i--;
                 continue;
             }
-            prey[i].updateAge(0.0001, 100, frame);
+            prey[i].updateAge(0.0001, 10, frame);
             prey[i].updateEnergy();
             prey[i].move();
-            prey[i].shiftDirectionRandomly(0.5);
+            prey[i].shiftDirectionRandomly(0.7);
         }
-
-        std::cout << prey.size() << std::endl;
 
         if(frame % 100 == 0){
             prey[RandomInt(0, prey.size(), rng)].reproduce(prey);
         }
+
     }
     return 0;
 }
