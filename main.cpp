@@ -307,22 +307,21 @@ public:
 
 };
 
-class QuadTree{
+class QuadTree {
 public:
-
     int currentDepth;
     Rectangle currentSize;
-    std::vector<Particle> particles;
+    std::vector<Creature> creatures;
     std::array<std::shared_ptr<QuadTree>, 4> children{};
     std::array<Rectangle, 4> childAreas{};
 
-    QuadTree(const int setDepth, const Rectangle& setSize){
+    QuadTree(const int setDepth, const Rectangle& setSize) {
         currentDepth = setDepth;
         resize(setSize);
     }
 
-    void resize(const Rectangle& setSize){
-        clear(); 
+    void resize(const Rectangle& setSize) {
+        clear();
         currentSize = setSize;
 
         float newWidth = currentSize.width / 2.0f, newHeight = currentSize.height / 2.0f;
@@ -334,58 +333,57 @@ public:
             Rectangle{x, y + newHeight, newWidth, newHeight},
             Rectangle{x + newWidth, y + newHeight, newWidth, newHeight}
         };
-
     }
 
-    void clear(){
-        particles.clear();
+    void clear() {
+        creatures.clear();
 
-        for(int i = 0; i < 4; i++){
-            if(children[i]){
+        for (int i = 0; i < 4; i++) {
+            if (children[i]) {
                 children[i]->clear();
             }
             children[i].reset();
         }
     }
 
-    void insert(const Particle& newParticle){
-        for(int i = 0 ; i < 4; i++){
-            if(CheckCollisionPointRec(newParticle.pos, childAreas[i])){
-                if(currentDepth + 1 < maxTreeDepth){
-                    if(!children[i]){
+    void insert(const Creature& newCreature) {
+        for (int i = 0; i < 4; i++) {
+            if (CheckCollisionPointRec(newCreature.position, childAreas[i])) {
+                if (currentDepth + 1 < maxTreeDepth) {
+                    if (!children[i]) {
                         children[i] = std::make_shared<QuadTree>(currentDepth + 1, childAreas[i]);
                     }
-                    children[i]->insert(newParticle);
+                    children[i]->insert(newCreature);
                     return;
                 }
             }
         }
 
-        //didn't fit in children, so must go here
-        particles.emplace_back(newParticle);
+        // Didn't fit in children, so must go here
+        creatures.emplace_back(newCreature);
     }
 
-    std::list<Particle> search(Vector2& center, float radius, bool removeSearched){
-        std::list<Particle> result;
+    std::list<Creature> search(Vector2& center, float radius, bool removeSearched) {
+        std::list<Creature> result;
 
         // Check if the search area intersects the QuadTree node's boundary
-        if(!CheckCollisionCircleRec(center, radius, currentSize)) {
+        if (!CheckCollisionCircleRec(center, radius, currentSize)) {
             return result;
         }
 
-        // If this node has particles, add the ones within the search area to the result list
-        for(unsigned int i = 0; i < particles.size(); i++){
-            if(CheckCollisionPointCircle(particles[i].pos, center, radius)){
-                result.push_back(particles[i]);
-                if(removeSearched){
-                    particles.erase(particles.begin() + i);
+        // If this node has creatures, add the ones within the search area to the result list
+        for (unsigned int i = 0; i < creatures.size(); i++) {
+            if (CheckCollisionPointCircle(creatures[i].position, center, radius)) {
+                result.push_back(creatures[i]);
+                if (removeSearched) {
+                    creatures.erase(creatures.begin() + i);
                 }
             }
         }
 
         // Recursively search the children nodes
-        for(int i = 0; i < 4; i++){
-            if(children[i]){
+        for (int i = 0; i < 4; i++) {
+            if (children[i]) {
                 auto childResult = children[i]->search(center, radius, removeSearched);
                 result.splice(result.end(), childResult);
             }
@@ -394,11 +392,11 @@ public:
         return result;
     }
 
-    std::vector<Particle> returnAll(int depth){
-        std::vector<Particle> result;
+    std::vector<Creature> returnAll(int depth){
+        std::vector<Creature> result;
 
         if(currentDepth >= depth){
-            result.insert(result.end(), particles.begin(), particles.end());
+            result.insert(result.end(), creatures.begin(), creatures.end());
         }
 
         for(int i = 0; i < 4; i++){
@@ -412,7 +410,7 @@ public:
     }
 
     int size() const{
-        int count = particles.size();
+        int count = creatures.size();
 
         for(int i = 0 ; i < 4; i++){
             if(children[i]){
@@ -424,8 +422,9 @@ public:
     }
 
     void draw() const{
-        for(const auto& particle : particles){
-            DrawPixelV(particle.pos, particle.color);
+        for(const auto& particle : creatures){
+            Color c = (particle.species == GenericPredator) ? RED : GREEN;
+            DrawPixelV(particle.position, c);
         }
 
         //DrawRectangleLinesEx(currentSize, 0.7, GREEN);
@@ -487,25 +486,6 @@ void drawBackground(){
     DrawFPS(screenWidth - 40, 20);
 }
 
-void run(){
-    initialize();
-
-    std::ofstream outFile;
-    outFile.open("data.csv");
-    outFile.close();
-
-    for(int frame = 0; !WindowShouldClose(); frame++) {
-
-        BeginDrawing();
-
-        drawBackground();
-
-        EndDrawing();
-    }
-
-    CloseWindow();
-}
-
 void drawHealthBar(Creature& creature, int barWidth, int barHeight, int verticalOffset, Color fullColor, Color emptyColor, int barType){
     double interbarDistance = 8;
 
@@ -526,23 +506,14 @@ QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& p
     Color predColor = RED, preyColor = GREEN;
 
     for(const auto& p : predators){
-        qt.insert(Particle{p.position, predColor});
+        qt.insert(p);
     }
 
     for(const auto& p : prey){
-        qt.insert(Particle{p.position, preyColor});
+        qt.insert(p);
     }
 
     return qt;
-}
-
-void checkCollisions(std::vector<Creature>& predators, std::vector<Creature>& prey, QuadTree& qt){
-    double searchRadius = 100;
-    std::list<Particle> colliding;
-
-    for(auto& predator : predators){
-        qt.search(predator.position, searchRadius, false);
-    }
 }
 
 void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
@@ -640,13 +611,11 @@ int main() {
     QuadTree qt(0, {0, 0, screenWidth, screenHeight});
 
     for(int i = 0; i < numPredators; i++){
-        Particle p(predators[i].position, RED);
-        qt.insert(p);
+        qt.insert(predators[i]);
     }
 
     for(int i = 0; i < numPrey; i++){
-        Particle p(prey[i].position, GREEN);
-        qt.insert(p);
+        qt.insert(prey[i]);
     }
 
 
