@@ -566,12 +566,6 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                     predators[i].energy += prey[j].energy;
                     prey.erase(prey.begin() + j);
                 }
-
-                /*if(predators[i].energy >= predators[i].initialEnergy and predators[i].canReproduce()){
-                    predators[i].reproduceA(predators);
-                    predators[i].reproductionTimer = 0;
-                    predators[i].energy = predators[i].initialEnergy/2;
-                }*/
             }
         }
         
@@ -580,7 +574,19 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                 if(predators[i].energy >= predators[i].initialEnergy * pr and predators[j].energy >= predators[j].initialEnergy * pr and predators[i].canReproduce() and predators[j].canReproduce()){
                     predators[i].reproduceS(predators, predators[j]);
                     predators[i].reproductionTimer = 0;
-                    predators[i].energy = predators[i].initialEnergy / 2;
+                    predators[i].energy = predators[i].energy / 2;
+                }
+            }
+        }
+    }
+
+    for(int i = 0; i < prey.size(); i++){
+        for(int j = 0; j < prey.size(); j++){
+            if(i != j and CheckCollisionCircles(prey[i].position, prey[i].size, prey[j].position, prey[j].size)){
+                if(prey[i].energy >= prey[i].initialEnergy * pr and prey[j].energy >= prey[j].initialEnergy * pr and prey[i].canReproduce() and prey[j].canReproduce()){
+                    prey[i].reproduceS(prey, prey[j]);
+                    prey[i].reproductionTimer = 0;
+                    prey[i].energy = prey[i].energy / 2;
                 }
             }
         }
