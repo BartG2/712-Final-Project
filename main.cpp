@@ -230,12 +230,25 @@ public:
     }
 
     void reproduceS(std::vector<Creature>& creatures, Creature parent2){
+        std::cout << "First\n";
         CreatureParameters kidParameters = singlePointCrossover(parent2);
+        std::cout << "Second\n";
         double mutationChance = 0.1;
         double mutationMagnitude = 0.25;
         kidParameters = mutate(kidParameters, mutationChance, mutationMagnitude);
+        std::cout << "Third\n";
 
-
+        if(position.x > 2*size){
+            Creature kid(kidParameters);
+            kid.direction = direction += 180;
+            creatures.push_back(kid);
+        }
+        else if(screenWidth - position.x > 2*size){
+            Creature kid(kidParameters);
+            kid.direction = direction += 180;
+            creatures.push_back(kid);
+        }
+        std::cout << "Fourth\n";
     }
 
     CreatureParameters mutate(CreatureParameters& p, double mChance, double magnitude){
@@ -270,7 +283,7 @@ public:
         CreatureParameters kidParameters;
         std::vector<double> traits1 = {maxSpeed, size, double(initialEnergy), double(sightRange), initialHealth, attackDamage, double(attackCooldownLength)};
         std::vector<double> traits2 = {p2.maxSpeed, p2.size, double(p2.initialEnergy), double(p2.sightRange), p2.initialHealth, p2.attackDamage, double(p2.attackCooldownLength)};
-        std::vector<double> traits3;
+        std::vector<double> traits3(traits1.size());
         int crossoverPoint = RandomInt(0, 6, rng);
 
         for(int i = 0; i < crossoverPoint; i++){
@@ -541,6 +554,9 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
     auto currentTime = std::chrono::high_resolution_clock::now();
     double currentTimeInSeconds = std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::microseconds>(currentTime.time_since_epoch())).count();
     
+    double predatorReproductionConst = 0.8;
+    double pr = predatorReproductionConst;
+
     for(int i = 0; i < predators.size(); i++){
         for(int j = 0; j < prey.size(); j++){
             if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
@@ -563,11 +579,17 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                 }*/
             }
         }
+        
+        for(int j = 0; j < predators.size(); j++){
+            if(i != j and CheckCollisionCircles(predators[i].position, predators[i].size, predators[j].position, predators[j].size)){
+                if(predators[i].energy >= predators[i].initialEnergy * pr and predators[j].energy >= predators[j].initialEnergy * pr and predators[i].canReproduce() and predators[j].canReproduce()){
+                    predators[i].reproduceS(predators, predators[j]);
+                    predators[i].reproductionTimer = 0;
+                    predators[i].energy = predators[i].initialEnergy / 2;
+                }
+            }
+        }
     }
-}
-
-void qtCollisionCheck(){
-
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------
@@ -575,7 +597,7 @@ void qtCollisionCheck(){
 int main() {
     initialize();
 
-    int numPredators = 2, numPrey = 500;
+    int numPredators = 20, numPrey = 700;
     Color predColor = RED, preyColor = GREEN;
 
     std::vector<Creature> predators(numPredators);
@@ -583,7 +605,7 @@ int main() {
 
     CreatureParameters initialPredatorP;
     initialPredatorP.species = GenericPredator;
-    initialPredatorP.size = 7;
+    initialPredatorP.size = 5;
     initialPredatorP.attackDamage = 50;
     initialPredatorP.energy = 100000;
     initialPredatorP.maxSpeed = 1;
@@ -656,7 +678,7 @@ int main() {
                 i--;
                 continue;
             }
-            predators[i].update(0.001, 10, frame);
+            predators[i].update(0.0001, 10, frame);
             predators[i].shiftDirectionRandomly(0.7);
         }
 
