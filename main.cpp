@@ -51,7 +51,7 @@ struct CreatureParameters {
     double size = 5;
     double energy = 100000;
     double attackDamage = 20;
-    double attackCooldownLength = 100;
+    double attackCooldownLength = 1;
 };
 
 class Creature {
@@ -74,7 +74,8 @@ public:
     unsigned long age;
     bool alive;
     double attackDamage;
-    bool attackCooldown;
+    double lastAttackTime;
+    double attackCooldownLength;
 
     Creature(const CreatureParameters& params)
         : species(params.species),
@@ -91,7 +92,7 @@ public:
           alive(true),
           age(0),
           attackDamage(params.attackDamage),
-          attackCooldown(false) {}
+          attackCooldownLength(params.attackCooldownLength) {}
 
     Creature() : Creature(CreatureParameters()) {}
 
@@ -127,6 +128,15 @@ public:
 
     void die(){
         alive = false;
+    }
+
+    bool canAttack(double currentTime){
+        if(currentTime - lastAttackTime > attackCooldownLength){
+            return true;
+        }
+        else{
+            return false;
+        }
     }
 
     void updateAge(double ageSpeedDecayFactor, double speedPeakAge, int frame){             //age is measured in seconds at 100 FPS
@@ -430,13 +440,16 @@ void checkCollisions(std::vector<Creature>& predators, std::vector<Creature>& pr
 }
 
 void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    double currentTimeInSeconds = std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::microseconds>(currentTime.time_since_epoch())).count();
+    
     for(int i = 0; i < predators.size(); i++){
         for(int j = 0; j < prey.size(); j++){
             if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
                 
-                if(!predators[i].attackCooldown){
+                if(predators[i].canAttack(currentTimeInSeconds)){
                     prey[j].health -= predators[i].attackDamage;
-                    predators[i].attackCooldown = true;
+                    predators[i].lastAttackTime = currentTimeInSeconds;
                 }
 
                 if(prey[j].health <= 0){
@@ -456,7 +469,7 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
 int main() {
     initialize();
 
-    int numPredators = 10, numPrey = 50;
+    int numPredators = 10, numPrey = 500;
     Color predColor = RED, preyColor = GREEN;
 
     std::vector<Creature> predators(numPredators);
@@ -469,6 +482,7 @@ int main() {
     initialPredatorP.energy = 100000;
     initialPredatorP.maxSpeed = 1;
     initialPredatorP.sightRange = 1;
+    initialPredatorP.attackCooldownLength = 1;
 
     CreatureParameters initialPreyP;
     initialPreyP.species = GenericPrey;
@@ -555,6 +569,7 @@ int main() {
         if(frame % 100 == 0){
             prey[RandomInt(0, prey.size(), rng)].reproduce(prey);
         }
+
 
     }
     return 0;
