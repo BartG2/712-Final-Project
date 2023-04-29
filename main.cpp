@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 #include <list>
+#include <algorithm>
 
 //---------------------------------------------------------------------------------------------------------------------------------
 
@@ -23,17 +24,6 @@ const int screenWidth = 2440, screenHeight = 1368, maxTreeDepth = 5;
 std::mt19937 rng = CreateGeneratorWithTimeSeed();
 
 //---------------------------------------------------------------------------------------------------------------------------------
-
-class Particle{
-public:
-    Vector2 pos;
-    Color color;
-
-    Particle(Vector2 position, Color col){
-        pos = position;
-        color = col;
-    }
-};
 
 enum CreatureType{
     GenericPrey,
@@ -71,8 +61,6 @@ public:
     double health;
     double initialHealth;
     double energyCost;
-    int foodLevel;
-    int waterLevel;
     unsigned long age;
     bool alive;
     double attackDamage;
@@ -93,17 +81,20 @@ public:
           position(params.position),
           direction(params.direction),
           health(params.health),
-          initialHealth(100),
+          initialHealth(params.health),
           size(params.size),
           energy(params.energy),
-          initialEnergy(100000),
+          initialEnergy(int(params.energy)),
           alive(true),
           age(0),
           attackDamage(params.attackDamage),
           attackCooldownLength(params.attackCooldownLength),
           attackCooldownTimer(0),
           reproductionCooldownLength(params.reproductionCooldownLength),
-          reproductionTimer(0) {}
+          reproductionTimer(0) 
+          {
+
+          }
 
     Creature() : Creature(CreatureParameters()) {}
 
@@ -201,7 +192,7 @@ public:
         }
     }
 
-    void reproduce(std::vector<Creature>& creatures){
+    void reproduceA(std::vector<Creature>& creatures){
 
         CreatureParameters kidParams;
         kidParams.species = species;
@@ -213,6 +204,8 @@ public:
         kidParams.size = size;
         kidParams.energy = initialEnergy;
         kidParams.attackDamage = attackDamage;
+        kidParams.attackCooldownLength = attackCooldownLength;
+        kidParams.reproductionCooldownLength = reproductionCooldownLength;
 
         if(position.x > 2*size){
             Creature kid(kidParams);
@@ -225,6 +218,86 @@ public:
             creatures.push_back(kid);
         }
     }
+
+    void reproduceS(std::vector<Creature>& creatures, Creature parent2){
+        CreatureParameters kidParameters = singlePointCrossover(parent2);
+        double mutationChance = 0.1;
+        double mutationMagnitude = 0.25;
+        kidParameters = mutate(kidParameters, mutationChance, mutationMagnitude);
+
+
+    }
+
+    CreatureParameters mutate(CreatureParameters& p, double mChance, double magnitude){
+        double div;
+        if(magnitude = 0.25){
+            div = 4;
+        }
+        else if (magnitude = 0.2){
+            div = 5;
+        }
+        else if (magnitude = 0.1){
+            div = 10;
+        }
+        else{
+            div = 10;
+        }
+
+        CreatureParameters params = p;
+
+
+        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.maxSpeed/div, params.maxSpeed/div, rng) : 0;
+        params.size += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.size/div, params.size/div, rng) : 0;
+        params.energy += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.energy/div, params.energy/div, rng) : 0;
+        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.sightRange/div, params.sightRange/div, rng) : 0;
+        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.health/div, params.health/div, rng) : 0;
+        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.attackDamage/div, params.attackDamage/div, rng) : 0;
+
+        return params;
+    }
+
+    CreatureParameters singlePointCrossover(Creature p2){
+        CreatureParameters kidParameters;
+        std::vector<double> traits1 = {maxSpeed, size, double(initialEnergy), double(sightRange), initialHealth, attackDamage, double(attackCooldownLength)};
+        std::vector<double> traits2 = {p2.maxSpeed, p2.size, double(p2.initialEnergy), double(p2.sightRange), p2.initialHealth, p2.attackDamage, double(p2.attackCooldownLength)};
+        std::vector<double> traits3;
+        int crossoverPoint = RandomInt(0, 6, rng);
+
+        for(int i = 0; i < crossoverPoint; i++){
+            traits3[i] = traits1[i];
+        }
+
+        for(int i = crossoverPoint; i < traits1.size(); i++){
+            traits3[i] = traits2[i];
+        }
+
+        kidParameters.maxSpeed = traits3[0];
+        kidParameters.size = traits3[1];
+        kidParameters.energy = traits3[2];
+        kidParameters.sightRange = traits3[3];
+        kidParameters.health = traits3[4];
+        kidParameters.attackDamage = traits3[5];
+        kidParameters.attackCooldownLength = traits3[6];
+
+        kidParameters.species = species;
+        kidParameters.direction = direction;
+        kidParameters.position = position;
+        kidParameters.reproductionCooldownLength = reproductionCooldownLength;
+
+        return kidParameters;
+    }
+
+};
+
+class Particle{
+public:
+    Vector2 pos;
+    Color color;
+    Creature& creature;
+
+    Particle(Vector2 position, Color col, Creature& c)
+        : pos(position), color(col), creature(c) {}
+
 };
 
 class QuadTree{
@@ -445,12 +518,12 @@ QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& p
     QuadTree qt(0, Rectangle{0, 0, screenWidth, screenHeight});
     Color predColor = RED, preyColor = GREEN;
 
-    for(const auto& p : predators){
-        qt.insert(Particle{p.position, predColor});
+    for(auto& p : predators){
+        qt.insert(Particle{p.position, predColor, p});
     }
 
-    for(const auto& p : prey){
-        qt.insert(Particle{p.position, preyColor});
+    for(auto& p : prey){
+        qt.insert(Particle{p.position, preyColor, p});
     }
 
     return qt;
@@ -476,6 +549,7 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                 if(predators[i].canAttack()){
                     prey[j].health -= predators[i].attackDamage;
                     predators[i].attackCooldownTimer = 0;
+                    predators[i].energy += prey[j].health * predators[i].attackDamage / prey[j].initialHealth;
                 }
 
                 if(prey[j].health <= 0){
@@ -483,21 +557,61 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                     prey.erase(prey.begin() + j);
                 }
 
-                if(predators[i].energy >= predators[i].initialEnergy and predators[i].canReproduce()){
-                    predators[i].reproduce(predators);
+                /*if(predators[i].energy >= predators[i].initialEnergy and predators[i].canReproduce()){
+                    predators[i].reproduceA(predators);
                     predators[i].reproductionTimer = 0;
-                    predators[i].energy *= 0.8;
+                    predators[i].energy = predators[i].initialEnergy/2;
+                }*/
+            }
+        }
+    }
+}
+
+void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey, QuadTree& qt) {
+    for (int i = 0; i < predators.size(); i++) {
+        Creature& predator = predators[i];
+        float searchRadius = predator.size /*+ predator.sightRange*/;
+
+        // Search for nearby particles using the quadtree
+        std::list<Particle> nearbyParticles = qt.search(predator.position, searchRadius, false);
+
+        for (const auto& particle : nearbyParticles) {
+            Creature& otherCreature = particle.creature;
+
+            if(CheckCollisionCircles(predator.position, predator.size, otherCreature.position, otherCreature.size)){
+                if(!vectorsEqual(predator.position, otherCreature.position) and predator.age != otherCreature.age){
+                    if(otherCreature.species == GenericPrey){
+                        if(predator.canAttack()){
+                            otherCreature.health -= predator.attackDamage;
+                            predator.attackCooldownTimer = 0;
+                            predator.energy += otherCreature.health * predator.attackDamage / otherCreature.initialHealth;
+                        }
+
+                        if(otherCreature.health <= 0){
+                            predator.energy += otherCreature.energy;
+
+                            // Find the otherCreature in the prey vector and erase it
+                            auto it = std::find_if(prey.begin(), prey.end(), [&](const Creature& c) {
+                                return vectorsEqual(c.position, otherCreature.position) && c.age == otherCreature.age;
+                            });
+
+                            if (it != prey.end()) {
+                                prey.erase(it);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
 //---------------------------------------------------------------------------------------------------------------------------------
 
 int main() {
     initialize();
 
-    int numPredators = 10, numPrey = 500;
+    int numPredators = 2, numPrey = 500;
     Color predColor = RED, preyColor = GREEN;
 
     std::vector<Creature> predators(numPredators);
@@ -506,12 +620,12 @@ int main() {
     CreatureParameters initialPredatorP;
     initialPredatorP.species = GenericPredator;
     initialPredatorP.size = 7;
-    initialPredatorP.attackDamage = 10;
+    initialPredatorP.attackDamage = 50;
     initialPredatorP.energy = 100000;
     initialPredatorP.maxSpeed = 1;
     initialPredatorP.sightRange = 1;
-    initialPredatorP.attackCooldownLength = 1;
-    initialPredatorP.reproductionCooldownLength = 50;
+    initialPredatorP.attackCooldownLength = 50;
+    initialPredatorP.reproductionCooldownLength = 500;
 
     CreatureParameters initialPreyP;
     initialPreyP.species = GenericPrey;
@@ -520,6 +634,8 @@ int main() {
     initialPreyP.energy = 100000;
     initialPreyP.maxSpeed = 1.1;
     initialPreyP.sightRange = 1;
+    initialPreyP.health = 100;
+    initialPreyP.attackCooldownLength = 100;
 
     for(int i = 0; i < numPredators; i++){
         initialPredatorP.position = {RandomFloat(0, screenWidth, rng), RandomFloat(0, screenHeight, rng)};
@@ -535,12 +651,12 @@ int main() {
     QuadTree qt(0, {0, 0, screenWidth, screenHeight});
 
     for(int i = 0; i < numPredators; i++){
-        Particle p(predators[i].position, RED);
+        Particle p(predators[i].position, RED, predators[i]);
         qt.insert(p);
     }
 
     for(int i = 0; i < numPrey; i++){
-        Particle p(prey[i].position, GREEN);
+        Particle p(prey[i].position, GREEN, prey[i]);
         qt.insert(p);
     }
 
@@ -592,7 +708,7 @@ int main() {
         }
 
         if(frame % 100 == 0){
-            prey[RandomInt(0, prey.size(), rng)].reproduce(prey);
+            prey[RandomInt(0, prey.size(), rng)].reproduceA(prey);
         }
 
 
