@@ -511,6 +511,7 @@ int main() {
     initialPredatorP.maxSpeed = 1;
     initialPredatorP.sightRange = 1;
     initialPredatorP.attackCooldownLength = 1;
+    initialPredatorP.reproductionCooldownLength = 50;
 
     CreatureParameters initialPreyP;
     initialPreyP.species = GenericPrey;
