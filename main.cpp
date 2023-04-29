@@ -584,9 +584,11 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
         for(int j = 0; j < prey.size(); j++){
             if(i != j and CheckCollisionCircles(prey[i].position, prey[i].size, prey[j].position, prey[j].size)){
                 if(prey[i].energy >= prey[i].initialEnergy * pr and prey[j].energy >= prey[j].initialEnergy * pr and prey[i].canReproduce() and prey[j].canReproduce()){
-                    prey[i].reproduceS(prey, prey[j]);
-                    prey[i].reproductionTimer = 0;
-                    prey[i].energy = prey[i].energy / 2;
+                    if(RandomFloat(0, 1, rng) <= 0.001){
+                        prey[i].reproduceS(prey, prey[j]);
+                        prey[i].reproductionTimer = 0;
+                        prey[i].energy = prey[i].energy / 2;
+                    }
                 }
             }
         }
@@ -658,15 +660,15 @@ int main() {
 
         // Draw predators
         for(int i = 0 ; i < predators.size(); i++){
-            drawHealthBar(predators[i], 40, 3, 20, GREEN, RED, 1);
-            drawHealthBar(predators[i], 40, 3, 20, BLUE, ORANGE, 2);
+            drawHealthBar(predators[i], 40, 3, 4+ predators[i].size, GREEN, RED, 1);
+            drawHealthBar(predators[i], 40, 3, 4+ predators[i].size, BLUE, ORANGE, 2);
             DrawCircleV(predators[i].position, predators[i].size, predColor);
         }
 
         // Draw prey
         for(int i = 0; i < prey.size(); i++){
-            drawHealthBar(prey[i], 40, 3, 20, GREEN, RED, 1);
-            drawHealthBar(prey[i], 40, 3, 20, BLUE, ORANGE, 2);
+            drawHealthBar(prey[i], 40, 3, 4+prey[i].size, GREEN, RED, 1);
+            drawHealthBar(prey[i], 40, 3, 4+prey[i].size, BLUE, ORANGE, 2);
             DrawCircleV(prey[i].position, prey[i].size, preyColor);
         }
 
