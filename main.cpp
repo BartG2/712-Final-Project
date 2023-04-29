@@ -109,8 +109,8 @@ public:
     Creature() : Creature(CreatureParameters()) {}
 
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
-        static constexpr double sightCost = 1;
-        return 0.01*size*size*size + 1*maxSpeed*maxSpeed + sightCost*sightRange;
+        static constexpr double sizeCost = 0.001, speedCost = 0.01, sightCost = 0.1;
+        return sizeCost*size*size + speedCost*maxSpeed*maxSpeed + sightCost*sightCost*sightRange;
     }
 
     void move(){
@@ -230,13 +230,10 @@ public:
     }
 
     void reproduceS(std::vector<Creature>& creatures, Creature parent2){
-        std::cout << "First\n";
         CreatureParameters kidParameters = singlePointCrossover(parent2);
-        std::cout << "Second\n";
-        double mutationChance = 0.1;
+        double mutationChance = 1.0;
         double mutationMagnitude = 0.25;
         kidParameters = mutate(kidParameters, mutationChance, mutationMagnitude);
-        std::cout << "Third\n";
 
         if(position.x > 2*size){
             Creature kid(kidParameters);
@@ -248,7 +245,6 @@ public:
             kid.direction = direction += 180;
             creatures.push_back(kid);
         }
-        std::cout << "Fourth\n";
     }
 
     CreatureParameters mutate(CreatureParameters& p, double mChance, double magnitude){
@@ -268,13 +264,12 @@ public:
 
         CreatureParameters params = p;
 
-
         params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.maxSpeed/div, params.maxSpeed/div, rng) : 0;
         params.size += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.size/div, params.size/div, rng) : 0;
         params.energy += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.energy/div, params.energy/div, rng) : 0;
-        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.sightRange/div, params.sightRange/div, rng) : 0;
-        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.health/div, params.health/div, rng) : 0;
-        params.maxSpeed += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.attackDamage/div, params.attackDamage/div, rng) : 0;
+        params.sightRange += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.sightRange/div, params.sightRange/div, rng) : 0;
+        params.health += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.health/div, params.health/div, rng) : 0;
+        params.attackDamage += (RandomFloat(0, 1, rng) <= mChance) ? RandomFloat(-params.attackDamage/div, params.attackDamage/div, rng) : 0;
 
         return params;
     }
