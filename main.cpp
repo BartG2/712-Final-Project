@@ -51,7 +51,9 @@ struct CreatureParameters {
     double size = 5;
     double energy = 100000;
     double attackDamage = 20;
-    double attackCooldownLength = 1;
+    //double attackCooldownLength = 1;
+    int attackCooldownLength = 1;
+    int reproductionCooldownLength = 10;
 };
 
 class Creature {
@@ -74,8 +76,14 @@ public:
     unsigned long age;
     bool alive;
     double attackDamage;
-    double lastAttackTime;
-    double attackCooldownLength;
+    //double lastAttackTime;
+    //double attackCooldownLength;
+
+    int attackCooldownLength;
+    int attackCooldownTimer;
+
+    int reproductionTimer;
+    int reproductionCooldownLength;
 
     Creature(const CreatureParameters& params)
         : species(params.species),
@@ -92,7 +100,10 @@ public:
           alive(true),
           age(0),
           attackDamage(params.attackDamage),
-          attackCooldownLength(params.attackCooldownLength) {}
+          attackCooldownLength(params.attackCooldownLength),
+          attackCooldownTimer(0),
+          reproductionCooldownLength(params.reproductionCooldownLength),
+          reproductionTimer(0) {}
 
     Creature() : Creature(CreatureParameters()) {}
 
@@ -122,21 +133,36 @@ public:
         else if(direction < 0){
             direction += 360;
         }
-
-
     }
 
     void die(){
         alive = false;
     }
 
-    bool canAttack(double currentTime){
-        if(currentTime - lastAttackTime > attackCooldownLength){
+    bool canAttack(){
+        if(attackCooldownTimer >= attackCooldownLength){
             return true;
         }
         else{
             return false;
         }
+    }
+
+    bool canReproduce(){
+        if(reproductionTimer >= reproductionCooldownLength){
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    void update(double ageFactor, double peakAge, int frame){
+        updateAge(ageFactor, peakAge, frame);
+        updateEnergy();
+        move();
+        attackCooldownTimer += 1;
+        reproductionTimer += 1;
     }
 
     void updateAge(double ageSpeedDecayFactor, double speedPeakAge, int frame){             //age is measured in seconds at 100 FPS
@@ -447,9 +473,9 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
         for(int j = 0; j < prey.size(); j++){
             if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
                 
-                if(predators[i].canAttack(currentTimeInSeconds)){
+                if(predators[i].canAttack()){
                     prey[j].health -= predators[i].attackDamage;
-                    predators[i].lastAttackTime = currentTimeInSeconds;
+                    predators[i].attackCooldownTimer = 0;
                 }
 
                 if(prey[j].health <= 0){
@@ -457,8 +483,10 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
                     prey.erase(prey.begin() + j);
                 }
 
-                if(predators[i].energy >= predators[i].initialEnergy){
+                if(predators[i].energy >= predators[i].initialEnergy and predators[i].canReproduce()){
                     predators[i].reproduce(predators);
+                    predators[i].reproductionTimer = 0;
+                    predators[i].energy *= 0.8;
                 }
             }
         }
@@ -547,9 +575,7 @@ int main() {
                 i--;
                 continue;
             }
-            predators[i].updateAge(0.001, 10, frame);
-            predators[i].updateEnergy();
-            predators[i].move();
+            predators[i].update(0.001, 10, frame);
             predators[i].shiftDirectionRandomly(0.7);
         }
 
@@ -560,9 +586,7 @@ int main() {
                 i--;
                 continue;
             }
-            prey[i].updateAge(0.0001, 10, frame);
-            prey[i].updateEnergy();
-            prey[i].move();
+            prey[i].update(0.0001, 10, frame);
             prey[i].shiftDirectionRandomly(0.7);
         }
 
