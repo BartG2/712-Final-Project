@@ -173,17 +173,17 @@ int main() {
     initialPredatorP.attackDamage = 50;
     initialPredatorP.energy = 100000;
     initialPredatorP.maxSpeed = 1;
-    initialPredatorP.sightRange = 10;
+    initialPredatorP.sightRange = 30*initialPredatorP.size;
     initialPredatorP.attackCooldownLength = 50;
     initialPredatorP.reproductionCooldownLength = 500;
 
     CreatureParameters initialPreyP;
     initialPreyP.species = CreatureType::GenericPrey;
-    initialPreyP.size = 17;
+    initialPreyP.size = 5;
     initialPreyP.attackDamage = 0;
     initialPreyP.energy = 100000;
     initialPreyP.maxSpeed = 1.1;
-    initialPreyP.sightRange = 1;
+    initialPreyP.sightRange = 2*initialPreyP.size;
     initialPreyP.health = 100;
     initialPreyP.attackCooldownLength = 100;
     initialPreyP.sightRange = 10;
@@ -233,6 +233,13 @@ int main() {
             drawHealthBar(predators[i], 40, 3, 4+ predators[i].size, GREEN, RED, 1);
             drawHealthBar(predators[i], 40, 3, 4+ predators[i].size, BLUE, ORANGE, 2);
             DrawCircleV(predators[i].position, predators[i].size, predColor);
+
+            // Draw line for predators
+            Vector2 endPoint{
+                predators[i].position.x + 200 * cos(DEG2RAD * predators[i].targetDirection),
+                predators[i].position.y + 200 * sin(DEG2RAD * predators[i].targetDirection)
+            };
+            DrawLineEx(predators[i].position, endPoint, 1, BLACK);
         }
 
         // Draw prey

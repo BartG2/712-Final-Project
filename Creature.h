@@ -16,10 +16,8 @@ class QuadTree;
 
 #include "CreatureType.h"
 #include "CreatureParameters.h"
-//#include "QuadTreeWrapper.h"
 
 #include "Functions.h"
-
 
 struct QuadTreeParameters;
 
@@ -109,7 +107,7 @@ public:
     }
 
     Vector2 nearestPredator(QuadTreeWrapper& qt){
-        Vector2 nearestPredatorPos;
+        Vector2 nearestPredatorPos = position;
         float minDistance = std::numeric_limits<float>::max();
 
         auto nearbyCreatures = qt.search(position, sightRange);
@@ -129,7 +127,7 @@ public:
     }
 
     Vector2 nearestPrey(QuadTreeWrapper& qt){
-        Vector2 nearestPreyPos;
+        Vector2 nearestPreyPos = position;
         float minDistance = std::numeric_limits<float>::max();
 
         auto nearbyCreatures = qt.search(position, sightRange);
@@ -167,6 +165,10 @@ public:
     void biasDirection(float targetDirection, float biasMagnitude){
         float diff = targetDirection - direction;
 
+        if(diff <= 1.0){
+            return;
+        }
+
         // Normalize the angle difference to the range [-180, 180]
         if (diff > 180) {
             diff -= 360;
@@ -187,10 +189,10 @@ public:
         direction = newDirection;
     }
 
-
     void move(QuadTreeWrapper& qt){
-        float targetDirection = findTargetDirection(qt);
-        float biasmagnitude = 1;
+        targetDirection = findTargetDirection(qt);
+        float biasmagnitude = 1.0;
+        biasDirection(targetDirection, biasmagnitude);
 
         float newX = position.x + maxSpeed*cos(direction);
         float newY = position.y + maxSpeed*sin(direction);
