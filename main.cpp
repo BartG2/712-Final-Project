@@ -658,7 +658,9 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
                 if(predator.canAttack()){
                     creature.health -= predator.attackDamage;
                     predator.attackCooldownTimer = 0;
+                    auto temp = creature.energy;
                     predator.energy += creature.energy * predator.attackDamage / creature.initialHealth;
+                    creature.energy -=  temp * predator.attackDamage / creature.initialHealth;
                 }
 
                 if(creature.health <= 0){
@@ -791,7 +793,7 @@ int main() {
                 continue;
             }
             predators[i].update(0.0001, 10, frame);
-            predators[i].shiftDirectionRandomly(0.7);
+            predators[i].shiftDirectionRandomly(0.5);
         }
 
         // Update prey
@@ -802,7 +804,7 @@ int main() {
                 continue;
             }
             prey[i].update(0.0001, 10, frame);
-            prey[i].shiftDirectionRandomly(0.7);
+            prey[i].shiftDirectionRandomly(0.5);
         }
 
         if(frame % 100 == 0){
