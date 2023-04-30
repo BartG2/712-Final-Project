@@ -556,7 +556,7 @@ QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& p
     return qt;
 }
 
-void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
+/*void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
     auto currentTime = std::chrono::high_resolution_clock::now();
     double currentTimeInSeconds = std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::microseconds>(currentTime.time_since_epoch())).count();
     
@@ -604,7 +604,7 @@ void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creat
             }
         }
     }
-}
+}*/
 
 void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey, QuadTreeWrapper& quadTreeWrapper) {
     // Clear the QuadTreeWrapper
@@ -713,8 +713,17 @@ int main() {
 
     for(int frame = 0; !WindowShouldClose(); frame++){
 
-        qt = initializeQT(predators, prey);
-        primativeCollisionCheck(predators, prey);
+        //qt = initializeQT(predators, prey);
+        //primativeCollisionCheck(predators, prey);
+
+        QuadTreeWrapper qtw(0, {0, 0, screenWidth, screenHeight});
+        for(int i = 0; i < predators.size(); i++){
+            qtw.insert(predators[i]);
+        }
+        for(int i = 0; i < prey.size(); i++){
+            qtw.insert(prey[i]);
+        }
+        qtCollisionCheck(predators, prey, qtw);
 
         BeginDrawing();
         drawBackground();
