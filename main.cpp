@@ -110,7 +110,7 @@ public:
     Creature() : Creature(CreatureParameters()) {}
 
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
-        static constexpr double sizeCost = 0.001, speedCost = 0.01, sightCost = 0.1;
+        static constexpr double sizeCost = 0.5, speedCost = 0.5, sightCost = 0.5;
         return sizeCost*size*size + speedCost*maxSpeed*maxSpeed + sightCost*sightCost*sightRange;
     }
 
@@ -578,60 +578,11 @@ QuadTree initializeQT(std::vector<Creature>& predators, std::vector<Creature>& p
     return qt;
 }
 
-/*void primativeCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey){
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    double currentTimeInSeconds = std::chrono::duration<double>(std::chrono::duration_cast<std::chrono::microseconds>(currentTime.time_since_epoch())).count();
-    
-    double predatorReproductionConst = 0.8;
-    double pr = predatorReproductionConst;
-
-    for(int i = 0; i < predators.size(); i++){
-        for(int j = 0; j < prey.size(); j++){
-            if(CheckCollisionCircles(predators[i].position, predators[i].size, prey[j].position, prey[j].size)){
-                
-                if(predators[i].canAttack()){
-                    prey[j].health -= predators[i].attackDamage;
-                    predators[i].attackCooldownTimer = 0;
-                    predators[i].energy += prey[j].health * predators[i].attackDamage / prey[j].initialHealth;
-                }
-
-                if(prey[j].health <= 0){
-                    predators[i].energy += prey[j].energy;
-                    prey.erase(prey.begin() + j);
-                }
-            }
-        }
-        
-        for(int j = 0; j < predators.size(); j++){
-            if(i != j and CheckCollisionCircles(predators[i].position, predators[i].size, predators[j].position, predators[j].size)){
-                if(predators[i].energy >= predators[i].initialEnergy * pr and predators[j].energy >= predators[j].initialEnergy * pr and predators[i].canReproduce() and predators[j].canReproduce()){
-                    predators[i].reproduceS(predators, predators[j]);
-                    predators[i].reproductionTimer = 0;
-                    predators[i].energy = predators[i].energy / 2;
-                }
-            }
-        }
-    }
-
-    for(int i = 0; i < prey.size(); i++){
-        for(int j = 0; j < prey.size(); j++){
-            if(i != j and CheckCollisionCircles(prey[i].position, prey[i].size, prey[j].position, prey[j].size)){
-                if(prey[i].energy >= prey[i].initialEnergy * pr and prey[j].energy >= prey[j].initialEnergy * pr and prey[i].canReproduce() and prey[j].canReproduce()){
-                    if(RandomFloat(0, 1, rng) <= 0.001){
-                        prey[i].reproduceS(prey, prey[j]);
-                        prey[i].reproductionTimer = 0;
-                        prey[i].energy = prey[i].energy / 2;
-                    }
-                }
-            }
-        }
-    }
-}*/
-
 void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& prey, QuadTreeWrapper& quadTreeWrapper) {
 
     std::vector<std::reference_wrapper<Creature>> qtPredators;
     std::vector<std::reference_wrapper<Creature>> qtPrey;
+    double pr = 0.8;
 
     for (auto& p : quadTreeWrapper.creatures) {
         if (p.species == GenericPredator) {
@@ -648,7 +599,6 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
         Vector2 center = predator.position;
         float radius = predator.size*2 + 10;
         std::vector<std::reference_wrapper<Creature>> nearbyCreatures = quadTreeWrapper.search(center, radius);
-        double pr = 0.8;
 
         // Iterate through nearby creatures and check for collisions
         for (Creature& creature : nearbyCreatures) {
@@ -682,6 +632,24 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
         }
     }
 
+    for(Creature& p1: qtPrey){
+        Vector2& center = p1.position;
+        float radius = p1.size*2 + 10;
+        std::vector<std::reference_wrapper<Creature>> nearbyCreatures = quadTreeWrapper.search(center, radius);
+
+        for(Creature& p2 : nearbyCreatures){
+            if (p2.species == GenericPrey && CheckCollisionCircles(center, p1.size, p2.position, p2.size) and p1.id != p2.id){
+
+                if(p1.energy >= p1.initialEnergy * pr and p2.energy >= p2.initialEnergy * pr and p1.canReproduce() and p2.canReproduce()){
+                    p1.reproduceS(quadTreeWrapper.creatures, p2);
+                    p1.reproductionTimer = 0;
+                    p2.reproductionTimer = 0;
+                    p1.energy /= 2;
+                }
+            }
+        }
+    }
+
     predators.clear();
     prey.clear();
 
@@ -707,7 +675,7 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
 int main() {
     initialize();
 
-    int numPredators = 20, numPrey = 70;
+    int numPredators = 20, numPrey = 40;
     Color predColor = RED, preyColor = GREEN;
 
     std::vector<Creature> predators(numPredators);
@@ -809,7 +777,7 @@ int main() {
 
         if(frame % 100 == 0){
             std::cout << "Predators: " << predators.size() << ", Prey: " << prey.size() << ", total: " << predators.size() + prey.size() << std::endl;
-            prey[RandomInt(0, prey.size(), rng)].reproduceA(prey);
+            //prey[RandomInt(0, prey.size(), rng)].reproduceA(prey);
         }
 
 
