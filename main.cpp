@@ -21,6 +21,10 @@ int RandomInt(int min, int max, std::mt19937& rng);
 const int screenWidth = 2440, screenHeight = 1368, maxTreeDepth = 5;
 
 std::mt19937 rng = CreateGeneratorWithTimeSeed();
+QuadTreeWrapper qtw;
+
+class QuadTree;
+class QuadTreeWrapper;
 
 //---------------------------------------------------------------------------------------------------------------------------------
 
@@ -74,14 +78,15 @@ public:
     unsigned long age;
     bool alive;
     double attackDamage;
-    //double lastAttackTime;
-    //double attackCooldownLength;
 
     int attackCooldownLength;
     int attackCooldownTimer;
 
     int reproductionTimer;
     int reproductionCooldownLength;
+
+    bool fightOrFlight;
+    float targetDirection;
 
     std::size_t id;
 
@@ -103,14 +108,18 @@ public:
           attackCooldownLength(params.attackCooldownLength),
           attackCooldownTimer(0),
           reproductionCooldownLength(params.reproductionCooldownLength),
-          reproductionTimer(0){
+          reproductionTimer(0),
+          fightOrFlight(false),
+          targetDirection(0)
+          
+          {
             generateUniqueId();
           }
 
     Creature() : Creature(CreatureParameters()) {}
 
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
-        static constexpr double sizeCost = 0.5, speedCost = 0.5, sightCost = 0.5;
+        static constexpr double sizeCost = 0.2, speedCost = 0.2, sightCost = 0.2;
         return sizeCost*size*size + speedCost*maxSpeed*maxSpeed + sightCost*sightCost*sightRange;
     }
 
@@ -136,9 +145,59 @@ public:
         id = hashFunc(combinedVars);
     }
 
+    Vector2 nearestPredator(QuadTreeWrapper& qt){
+        Vector2 nearestPredatorPos;
+        float minDistance = std::numeric_limits<float>::max();
+
+        auto nearbyCreatures = qt.search(position, sightRange);
+
+        for(auto& creature : nearbyCreatures){
+            if(creature.get().species == GenericPredator){
+                float distance = vector2distance(position, creature.get().position);
+
+                if(distance < minDistance){
+                    minDistance = distance;
+                    nearestPredatorPos = creature.get().position;
+                }
+            }
+        }
+
+        return nearestPredatorPos;
+    }
+
+    Vector2 nearestPrey(QuadTreeWrapper& qt){
+        Vector2 nearestPreyPos;
+        float minDistance = std::numeric_limits<float>::max();
+
+        auto nearbyCreatures = qt.search(position, sightRange);
+
+        for(auto& creature : nearbyCreatures){
+            if(creature.get().species == GenericPrey){
+                float distance = vector2distance(position, creature.get().position);
+
+                if(distance < minDistance){
+                    minDistance = distance;
+                    nearestPreyPos = creature.get().position;
+                }
+            }
+        }
+
+        return nearestPreyPos;
+    }
+
+    float findTargetDirection(){
+
+    }
+
     void move(){
+
+        if(fightOrFlight){
+            float targetDirection, biasMagnitude;
+        }
+
         float newX = position.x + maxSpeed*cos(direction);
         float newY = position.y + maxSpeed*sin(direction);
+
         if(newX <= screenWidth and newX >= 0 and newY >= 0 and newY <= screenHeight){
             position = {newX, newY};
         }
@@ -151,6 +210,7 @@ public:
         float d = RandomFloat(-magnitude, magnitude, rng);
 
         direction += d;
+
         if(direction > 360){
             direction -=  360;
         }
@@ -536,6 +596,21 @@ float vector2distance(Vector2 v1, Vector2 v2) {
     float dy = v2.y - v1.y;
     return std::sqrt(dx * dx + dy * dy);
 }
+
+float vector2direction(const Vector2& vec1, const Vector2& vec2) {
+    float deltaX = vec2.x - vec1.x;
+    float deltaY = vec2.y - vec1.y;
+
+    float angle = atan2(deltaY, deltaX) * 180 / M_PI;
+
+    // Adjust the angle to be in the range [0, 360)
+    if (angle < 0) {
+        angle += 360;
+    }
+
+    return angle;
+}
+
 //---------------------------------------------------------------------------------------------------------------------------------
 
 void initialize(){
@@ -723,9 +798,13 @@ int main() {
     }
 
 
+
+
+
+
     for(int frame = 0; !WindowShouldClose(); frame++){
 
-        QuadTreeWrapper qtw(0, {0, 0, screenWidth, screenHeight});
+        qtw(0, {0, 0, screenWidth, screenHeight});
         for(int i = 0; i < predators.size(); i++){
             qtw.insert(predators[i]);
         }
