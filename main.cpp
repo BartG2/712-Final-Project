@@ -83,6 +83,8 @@ public:
     int reproductionTimer;
     int reproductionCooldownLength;
 
+    std::size_t id;
+
     Creature(const CreatureParameters& params)
         : species(params.species),
           maxSpeed(params.maxSpeed),
@@ -101,9 +103,8 @@ public:
           attackCooldownLength(params.attackCooldownLength),
           attackCooldownTimer(0),
           reproductionCooldownLength(params.reproductionCooldownLength),
-          reproductionTimer(0) 
-          {
-
+          reproductionTimer(0){
+            generateUniqueId();
           }
 
     Creature() : Creature(CreatureParameters()) {}
@@ -111,6 +112,28 @@ public:
     double calculateEnergyCost(double maxSpeed, int sightRange, int size){
         static constexpr double sizeCost = 0.001, speedCost = 0.01, sightCost = 0.1;
         return sizeCost*size*size + speedCost*maxSpeed*maxSpeed + sightCost*sightCost*sightRange;
+    }
+
+    void generateUniqueId() {
+        std::string combinedVars = std::to_string(static_cast<int>(species)) +
+                                    std::to_string(energy) +
+                                    std::to_string(initialEnergy) +
+                                    std::to_string(maxSpeed) +
+                                    std::to_string(initialMaxSpeed) +
+                                    std::to_string(direction) +
+                                    std::to_string(position.x) +
+                                    std::to_string(position.y) +
+                                    std::to_string(velocity.x) +
+                                    std::to_string(velocity.y) +
+                                    std::to_string(sightRange) +
+                                    std::to_string(size) +
+                                    std::to_string(health) +
+                                    std::to_string(initialHealth) +
+                                    std::to_string(energyCost) +
+                                    std::to_string(age);
+
+        std::hash<std::string> hashFunc;
+        id = hashFunc(combinedVars);
     }
 
     void move(){
@@ -629,6 +652,7 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
         Vector2 center = predator.position;
         float radius = predator.size*2 + 10;
         std::vector<Creature*> nearbyCreatures = quadTreeWrapper.search(center, radius);
+        double pr = 0.8;
 
         // Iterate through nearby creatures and check for collisions
         for (Creature* creature : nearbyCreatures) {
@@ -636,7 +660,7 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
                 
                 // pred-prey collision
                 if(predator.canAttack()){
-                    predator.size += 20;
+                    predator.size += 1;
                     creature->health -= predator.attackDamage;
                     predator.attackCooldownTimer = 0;
                     predator.energy += creature->energy * predator.attackDamage / creature->initialHealth;
@@ -645,6 +669,16 @@ void qtCollisionCheck(std::vector<Creature>& predators, std::vector<Creature>& p
                 if(creature->health <= 0){
                     predator.energy += creature->energy;
                     creature->die();
+                }
+            }
+
+            if(creature->species == GenericPredator and CheckCollisionCircles(center, predator.size, creature->position, creature->size) and predator.id != creature->id){
+
+                //pred-pred collision
+                if(predator.energy >= predator.initialEnergy * pr and creature->energy >= creature->initialEnergy * pr and predator.canReproduce() and creature->canReproduce()){
+                    predator.reproduceS(predators, *creature);
+                    predator.reproductionTimer = 0;
+                    predator.energy /= 2;
                 }
             }
         }
