@@ -40,7 +40,10 @@ bool Creature::updateEnergy(float deltaTime) {
         // If not, reduce its health and potentially kill it
         health -= -energy; // Convert negative energy to health damage
         energy = 0; // Reset energy to 0
-        if (health <= 0) return false; // Creature died
+        if (health <= 0) {
+            isAlive = false;
+            return false; // Creature died
+        }
     }
 
     return true; // Creature survived
