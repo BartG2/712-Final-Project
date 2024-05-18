@@ -45,31 +45,6 @@ int main(){
     while(!WindowShouldClose()){
         UpdateLogic(creatures);
         DrawGame(creatures);
-
-        for (auto& creature : creatures) {
-            if (creature.selected) {
-                if (IsKeyDown(KEY_W)) {
-                    Vector2 currentAcceleration = creature.getAcceleration();
-                    currentAcceleration.y -= 0.1;
-                    creature.setAcceleration(currentAcceleration);
-                }
-                if (IsKeyDown(KEY_S)) {
-                    Vector2 currentAcceleration = creature.getAcceleration();
-                    currentAcceleration.y += 0.1;
-                    creature.setAcceleration(currentAcceleration);
-                }
-                if (IsKeyDown(KEY_A)) {
-                    Vector2 currentAcceleration = creature.getAcceleration();
-                    currentAcceleration.x -= 0.1;
-                    creature.setAcceleration(currentAcceleration);
-                }
-                if (IsKeyDown(KEY_D)) {
-                    Vector2 currentAcceleration = creature.getAcceleration();
-                    currentAcceleration.x += 0.1;
-                    creature.setAcceleration(currentAcceleration);
-                }
-            }
-        }
     }
     CloseWindow();
 
@@ -88,12 +63,6 @@ void UpdateLogic(std::list<Creature>& creatures){
         creature.updateMovement(deltaTime);
         creature.updateEnergy(deltaTime);
     }
-}
-
-void DrawGame(std::list<Creature>& creatures){
-    BeginDrawing();
-
-    ClearBackground(RAYWHITE);
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         Vector2 mousePosition = GetMousePosition();
@@ -106,6 +75,37 @@ void DrawGame(std::list<Creature>& creatures){
             }
         }
     }
+
+    for (auto& creature : creatures) {
+        if (creature.selected) {
+            if (IsKeyDown(KEY_W)) {
+                Vector2 currentAcceleration = creature.getAcceleration();
+                currentAcceleration.y -= 0.1;
+                creature.setAcceleration(currentAcceleration);
+            }
+            if (IsKeyDown(KEY_S)) {
+                Vector2 currentAcceleration = creature.getAcceleration();
+                currentAcceleration.y += 0.1;
+                creature.setAcceleration(currentAcceleration);
+            }
+            if (IsKeyDown(KEY_A)) {
+                Vector2 currentAcceleration = creature.getAcceleration();
+                currentAcceleration.x -= 0.1;
+                creature.setAcceleration(currentAcceleration);
+            }
+            if (IsKeyDown(KEY_D)) {
+                Vector2 currentAcceleration = creature.getAcceleration();
+                currentAcceleration.x += 0.1;
+                creature.setAcceleration(currentAcceleration);
+            }
+        }
+    }
+}
+
+void DrawGame(std::list<Creature>& creatures){
+    BeginDrawing();
+
+    ClearBackground(RAYWHITE);
 
     for(auto& creature : creatures){
         drawCreature(creature);
