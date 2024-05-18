@@ -469,11 +469,11 @@ bool vectorsEqual(Vector2 v1, Vector2 v2){
     }
 }
 
-float vector2distance(Vector2 v1, Vector2 v2) {
+/*float vector2distance(Vector2 v1, Vector2 v2) {
     float dx = v2.x - v1.x;
     float dy = v2.y - v1.y;
     return std::sqrt(dx * dx + dy * dy);
-}
+}*/
 //---------------------------------------------------------------------------------------------------------------------------------
 
 void initialize(){
